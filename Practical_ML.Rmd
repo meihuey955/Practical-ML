@@ -1,0 +1,152 @@
+---
+title: "Practical Machine Learning"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Peer-graded assignment - Weight Lifting Exercises
+
+
+## Load required Libraries
+```{r}
+library(ggplot2)
+library(randomForest)
+library(caret)
+library(DMwR)
+library(corrgram)
+
+```
+
+
+## Load training and testing data
+```{r}
+URL1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+URL2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+file1 <- "pml-training.csv"
+file2 <- "pml-testing.csv"
+download.file(url=URL1, destfile=file1,method="curl")
+download.file(url=URL2, destfile=file2,method="curl")
+trainig_Data = read.csv("pml-training.csv", header = T)
+testing_Data = read.csv("pml-testing.csv", header = T)
+
+```
+
+
+## Check unique values
+```{r}
+UniqueValues = function(data){
+  temp = data.frame(apply(data, 2, function(x){length(unique(x))}))
+  temp$Variables = row.names(temp)
+  row.names(temp) = NULL
+  names(temp)[1] = 'UniqueCount'
+  temp = temp[,c(2,1)]
+  return(temp)
+}
+```
+
+```{r}
+UniqueCount = UniqueValues(trainig_Data)
+UniqueCount = UniqueValues(testing_Data)
+```
+
+
+## Remove near zero covariates
+```{r}
+nsv <- nearZeroVar(trainig_Data,saveMetrics=TRUE)
+trainig_Data <- trainig_Data[,!nsv$nzv]
+nsv <- nearZeroVar(testing_Data,saveMetrics=TRUE)
+testing_Data <- testing_Data[,!nsv$nzv]
+```
+
+
+## Missing Value Analysis - Check missing values
+```{r}
+MissingValues = function(data){
+  temp = data.frame(apply(data, 2, function(x){sum(is.na(x))}))
+  temp$Variables = row.names(temp)
+  row.names(temp) = NULL
+  names(temp)[1] = 'Count'
+  temp = temp[,c(2,1)]
+  return(temp)
+}
+```
+```{r}
+MissingAnalysis = MissingValues(trainig_Data)
+
+```
+
+
+## Drop variables with missing values
+```{r}
+trainig_Data_remove_na <- trainig_Data[,(colSums(is.na(trainig_Data)) == 0)]
+testing_Data_remove_na <- testing_Data[,(colSums(is.na(testing_Data)) == 0)]
+```
+
+
+## Drop unnecessary columns
+```{r}
+drop_var_train <- c("X","user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","num_window")
+drop_var_test <- c("user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","num_window","problem_id")
+new_trainig_Data <- trainig_Data_remove_na[,!(names(trainig_Data_remove_na) %in% drop_var_train)]
+new_testing_Data <- testing_Data_remove_na[,!(names(testing_Data_remove_na) %in% drop_var_test)]
+dim(new_trainig_Data)
+dim(new_testing_Data)
+
+```
+
+
+
+
+
+##Model Development
+### Divide data into train and test set
+### Train the model by using Random Forest algorithm
+```{r}
+train.index = createDataPartition(new_trainig_Data$classe, p = .75, list = FALSE)
+train = new_trainig_Data[ train.index,]
+validation  = new_trainig_Data[-train.index,]
+
+set.seed(12345)
+
+# Train Random forest model
+RF_model = randomForest(classe ~., train, importance = TRUE, ntree = 100,  cv.fold=2)
+
+# Run Model on test data
+Pred = predict(RF_model, validation)
+
+```
+
+## Evaluate the performance of model
+```{r}
+confmatrix_RF= table(validation$classe, Pred)
+confusionMatrix(confmatrix_RF)
+```
+##The accuracy of the model is 99%
+
+
+## Check important variable
+```{r}
+varImpPlot(RF_model)
+
+```
+
+
+##Prediction 
+##Use the trained random forest model to predict on the testing data
+```{r}
+Pred_test_clean = predict(RF_model, new_testing_Data)
+Pred_test_clean
+```
+
+
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
